@@ -1,5 +1,7 @@
-# Backend (separate git repository)
-Backend/
+# Backend dependencies
+Backend/node_modules/
+Backend/package-lock.json
+Backend/yarn.lock
 
 # Frontend dependencies
 Frontend/node_modules/
