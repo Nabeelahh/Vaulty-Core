@@ -1,0 +1,191 @@
+import { userRepository } from '../repositories/user.repository';
+import { AppError } from '../utils/AppError';
+import { hashPassword, comparePassword, generateSecureToken, generateTokenExpiry } from '../utils/crypto';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken, TokenPayload } from '../utils/jwt';
+import type { RegisterInput, LoginInput, ForgotPasswordInput, ResetPasswordInput, VerifyEmailInput } from '../validators/auth.validator';
+
+export class AuthService {
+  async register(data: RegisterInput) {
+    // Check if user already exists
+    const existingUser = await userRepository.findByEmail(data.email);
+    if (existingUser) {
+      throw new AppError('User with this email already exists', 409);
+    }
+
+    if (data.phoneNumber) {
+      const existingPhone = await userRepository.findByPhoneNumber(data.phoneNumber);
+      if (existingPhone) {
+        throw new AppError('User with this phone number already exists', 409);
+      }
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(data.password);
+
+    // Create user
+    const user = await userRepository.create({
+      email: data.email,
+      passwordHash,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      phoneNumber: data.phoneNumber,
+    });
+
+    // Generate email verification token
+    const verificationToken = generateSecureToken();
+    const expiresAt = generateTokenExpiry(60 * 24); // 24 hours
+    await userRepository.createEmailVerificationToken(user.id, verificationToken, expiresAt);
+
+    // TODO: Send verification email (implement in email service)
+
+    return {
+      user,
+      verificationToken,
+    };
+  }
+
+  async login(data: LoginInput) {
+    // Find user by email
+    const user = await userRepository.findByEmail(data.email);
+    if (!user) {
+      throw new AppError('Invalid email or password', 401);
+    }
+
+    // Verify password
+    const isValidPassword = await comparePassword(data.password, user.passwordHash);
+    if (!isValidPassword) {
+      throw new AppError('Invalid email or password', 401);
+    }
+
+    // Update last login
+    await userRepository.update(user.id, { lastLoginAt: new Date() });
+
+    // Generate tokens
+    const tokenPayload: TokenPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = generateAccessToken(tokenPayload);
+    const refreshToken = generateRefreshToken(tokenPayload);
+
+    // Return user without sensitive data
+    const { passwordHash, ...userWithoutPassword } = user;
+
+    return {
+      user: userWithoutPassword,
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      const payload = verifyRefreshToken(refreshToken);
+      const user = await userRepository.findById(payload.userId);
+
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      // Generate new tokens
+      const tokenPayload: TokenPayload = {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      };
+
+      const newAccessToken = generateAccessToken(tokenPayload);
+      const newRefreshToken = generateRefreshToken(tokenPayload);
+
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      };
+    } catch (error) {
+      throw new AppError('Invalid or expired refresh token', 401);
+    }
+  }
+
+  async forgotPassword(data: ForgotPasswordInput) {
+    const user = await userRepository.findByEmail(data.email);
+    if (!user) {
+      // Don't reveal if user exists for security
+      return { message: 'If the email exists, a reset link has been sent' };
+    }
+
+    // Generate reset token
+    const resetToken = generateSecureToken();
+    const expiresAt = generateTokenExpiry(60); // 1 hour
+    await userRepository.createPasswordResetToken(user.id, resetToken, expiresAt);
+
+    // TODO: Send password reset email (implement in email service)
+
+    return { message: 'If the email exists, a reset link has been sent' };
+  }
+
+  async resetPassword(data: ResetPasswordInput) {
+    // Find valid token
+    const tokenRecord = await userRepository.findValidPasswordResetToken(data.token);
+    if (!tokenRecord) {
+      throw new AppError('Invalid or expired reset token', 400);
+    }
+
+    if (tokenRecord.used) {
+      throw new AppError('Reset token has already been used', 400);
+    }
+
+    if (tokenRecord.expiresAt < new Date()) {
+      throw new AppError('Reset token has expired', 400);
+    }
+
+    // Hash new password
+    const passwordHash = await hashPassword(data.password);
+
+    // Update user password
+    await userRepository.update(tokenRecord.userId, { passwordHash });
+
+    // Invalidate token
+    await userRepository.invalidatePasswordResetToken(data.token);
+
+    return { message: 'Password has been reset successfully' };
+  }
+
+  async verifyEmail(data: VerifyEmailInput) {
+    // Find valid token
+    const tokenRecord = await userRepository.findValidEmailVerificationToken(data.token);
+    if (!tokenRecord) {
+      throw new AppError('Invalid or expired verification token', 400);
+    }
+
+    if (tokenRecord.used) {
+      throw new AppError('Verification token has already been used', 400);
+    }
+
+    if (tokenRecord.expiresAt < new Date()) {
+      throw new AppError('Verification token has expired', 400);
+    }
+
+    // Update user as verified
+    await userRepository.update(tokenRecord.userId, {
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+    });
+
+    // Invalidate token
+    await userRepository.invalidateEmailVerificationToken(data.token);
+
+    return { message: 'Email has been verified successfully' };
+  }
+
+  async getProfile(userId: string) {
+    const user = await userRepository.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    return user;
+  }
+}
+
+export const authService = new AuthService();

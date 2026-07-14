@@ -1,0 +1,181 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  SAVINGS_CONTRIBUTION
+  SAVINGS_WITHDRAWAL
+}
+
+enum VaultStatus {
+  ACTIVE
+  LOCKED
+  CLOSED
+}
+
+enum VaultType {
+  PERSONAL
+  GROUP
+  GOAL_ORIENTED
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  firstName         String?
+  lastName          String?
+  phoneNumber       String?   @unique
+  isEmailVerified   Boolean   @default(false)
+  emailVerifiedAt   DateTime?
+  role              UserRole  @default(USER)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastLoginAt       DateTime?
+  
+  // Relations
+  wallets           Wallet[]
+  savingsVaults     SavingsVault[]
+  transactions      Transaction[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  
+  @@map("users")
+}
+
+model Wallet {
+  id                String    @id @default(cuid())
+  userId            String
+  publicKey         String    @unique
+  secretKeyEncrypted String?
+  stellarAddress    String    @unique
+  balance           String    @default("0")
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("wallets")
+}
+
+model SavingsVault {
+  id                String      @id @default(cuid())
+  userId            String
+  name              String
+  description       String?
+  targetAmount      String
+  currentAmount     String      @default("0")
+  type              VaultType   @default(PERSONAL)
+  status            VaultStatus @default(ACTIVE)
+  targetDate        DateTime?
+  lockPeriod        Int?        // in days
+  interestRate      String?     // percentage
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("savings_vaults")
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  userId            String
+  type              TransactionType
+  status            TransactionStatus  @default(PENDING)
+  amount            String
+  fee               String            @default("0")
+  description       String?
+  reference         String?           @unique
+  stellarTransactionHash String?
+  fromAddress       String?
+  toAddress         String?
+  vaultId           String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  completedAt       DateTime?
+  
+  // Relations
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("transactions")
+}
+
+model PasswordResetToken {
+  id                String    @id @default(cuid())
+  userId            String
+  token             String    @unique
+  expiresAt         DateTime
+  used              Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id                String    @id @default(cuid())
+  userId            String
+  token             String    @unique
+  expiresAt         DateTime
+  used              Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("email_verification_tokens")
+}
+
+// Placeholder models for future phases
+// model Loan {
+//   id                String    @id @default(cuid())
+//   // Loan fields
+//   @@map("loans")
+// }
+
+// model Investment {
+//   id                String    @id @default(cuid())
+//   // Investment fields
+//   @@map("investments")
+// }
+
+// model Reward {
+//   id                String    @id @default(cuid())
+//   // Reward fields
+//   @@map("rewards")
+// }
+
+// model Notification {
+//   id                String    @id @default(cuid())
+//   // Notification fields
+//   @@map("notifications")
+// }
