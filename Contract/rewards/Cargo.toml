@@ -1,0 +1,11 @@
+[package]
+name = "rewards"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+soroban-sdk.workspace = true
+shared.workspace = true
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
