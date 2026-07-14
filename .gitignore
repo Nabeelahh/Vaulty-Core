@@ -1,0 +1,21 @@
+# Backend (separate git repository)
+Backend/
+
+# Frontend dependencies
+Frontend/node_modules/
+Frontend/.next/
+Frontend/out/
+Frontend/.env.local
+Frontend/.env
+Frontend/package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
