@@ -1,0 +1,36 @@
+name: Contracts CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Contract/**'
+      - '.github/workflows/contracts-ci.yml'
+  pull_request:
+    paths:
+      - 'Contract/**'
+      - '.github/workflows/contracts-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test Soroban contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Contract
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build contracts
+        run: cargo build --workspace
+
+      - name: Run tests
+        run: cargo test --workspace
