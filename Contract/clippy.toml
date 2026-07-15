@@ -1,0 +1,5 @@
+# Clippy linter configuration for Vaulty contracts
+# Additional lints can be added as needed
+
+# Allow certain pedantic lints that may not be practical for Soroban contracts
+# while still maintaining code quality

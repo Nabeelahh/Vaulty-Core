@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "vault",
+    "streaks",
+    "lending",
+    "borrowing",
+    "rewards",
+    "shared",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+soroban-sdk = "20.0.0"
+shared = { path = "shared" }
